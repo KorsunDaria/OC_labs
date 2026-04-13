@@ -5,7 +5,6 @@
 
 
 // hexdump -C heap.bin
-//
 
 #define HEAP_SIZE (1024)
 
@@ -38,7 +37,6 @@ void init_heap_file(const char* filename) {
     close(fd);
 }
 
-// --- вывод состояния кучи ---
 void print_heap() {
     block_t* cur = heap;
     printf("Heap blocks:\n");
@@ -49,10 +47,10 @@ void print_heap() {
     printf("\n");
 }
 
-// --- ожидание Enter ---
+
 void wait_for_enter() {
     printf("Press [Enter] to continue...\n");
-    while(getchar() != '\n'); // ждём нажатия Enter
+    while(getchar() != '\n');
 }
 
 void* my_malloc(size_t size) {

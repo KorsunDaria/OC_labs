@@ -2,54 +2,88 @@
 #include <stdlib.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <stdint.h>
 
-int global_var = 100;  // Глобальная переменная
+int global_var = 100;
+
+
+uintptr_t get_page(uintptr_t virtual_addr) {
+    int fd = open("/proc/self/pagemap", O_RDONLY);
+    if (fd < 0) {
+        perror("open pagemap (run with sudo if needed)");
+        return 0;
+    }
+
+    uint64_t value;
+    long page_size = sysconf(_SC_PAGESIZE);
+    off_t offset = (virtual_addr / page_size) * sizeof(value);
+
+    if (pread(fd, &value, sizeof(value), offset) != sizeof(value)) {
+        close(fd);
+        return 0;
+    }
+    close(fd);
+
+    
+    if (!(value & (1ULL << 63))) {
+        return 0;
+    }
+
+    uint64_t pfn = value & ((1ULL << 55) - 1);
+    return pfn;
+}
+
+void print_ptrs(const char* label, int* g, int* l) {
+    printf("--- %s ---\n", label);
+    uintptr_t phys_g = get_page((uintptr_t)g);
+    uintptr_t phys_l = get_page((uintptr_t)l);
+
+    printf("Virt: G=%p, L=%p\n", (void*)g, (void*)l);
+    printf("Phys PFN: G=0x%lx, L=0x%lx\n", phys_g, phys_l);
+    printf("Val : G=%d, L=%d\n", *g, *l);
+    printf("\n");
+}
 
 int main() {
-  int local_var = 10;  // Локальная переменная
-  pid_t pid;
+    int local_var = 10;
+    pid_t pid;
 
-  printf("--- До fork() ---\n");
-  printf("Global: addr=%p, val=%d\n", (void*)&global_var, global_var);
-  printf("Local:  addr=%p, val=%d\n", (void*)&local_var, local_var);
-  printf("PID: %d\n\n", getpid());
+    print_ptrs("До fork()", &global_var, &local_var);
 
-  pid = fork();
+    pid = fork();
 
-  if (pid < 0) {
-    perror("fork failed");
-    exit(1);
-  } else if (pid == 0) {  // Дочерний процесс
-    printf("--- Дочерний процесс ---\n");
-    printf("PID: %d, PPID: %d\n", getpid(), getppid());
-    printf("Адреса те же: Global=%p, Local=%p\n", (void*)&global_var,
-           (void*)&local_var);
-    printf(
-        "Значения родительских переменных в дочернем процессе : Global=%d, "
-        "Local=%d\n",
-        global_var, local_var);
-    global_var = 200;
-    local_var = 20;
-    printf(" ");
-    printf("Измененные значения в child: Global=%d, Local=%d\n", global_var,
-           local_var);
+    if (pid < 0) {
+        perror("fork failed");
+        exit(1);
+    } 
+    else if (pid == 0) { 
+        printf("--- В дочернем процессе (PID: %d) ---\n", getpid());
+        print_ptrs("Сразу после fork (чтение)", &global_var, &local_var);
 
-    exit(5);
-  } else {
-    sleep(1);
-    printf("\n--- Родительский процесс ---\n");
-    printf("Значения в parent: Global=%d, Local=%d\n", global_var, local_var);
-    sleep(40);
+        printf("Изменяем переменные в дочернем процессе...\n\n");
+        global_var = 200;
+        local_var = 20;
 
-    int status;
-    waitpid(pid, &status, 0);  // Ожидание завершения
+        print_ptrs("После изменения (запись)", &global_var, &local_var);
+        
+        exit(5);
+    } 
+    else { 
+        sleep(2); 
+        printf("--- В родительском процессе (PID: %d) ---\n", getpid());
+        print_ptrs("После того как ребенок изменил свои копии", &global_var, &local_var);
+        
+        printf("Родитель засыпает (проверьте ps/maps)...\n");
+        sleep(30);
 
-    if (WIFEXITED(status)) {
-      printf("\nДочерний процесс завершен. Код: %d\n", WEXITSTATUS(status));
-    } else if (WIFSIGNALED(status)) {
-      printf("\nДочерний процесс убит сигналом: %d\n", WTERMSIG(status));
+        int status;
+        waitpid(pid, &status, 0);
+
+        if (WIFEXITED(status)) {
+            printf("\nДочерний процесс завершен. Код: %d\n", WEXITSTATUS(status));
+        }
     }
-  }
 
-  return 0;
+    return 0;
 }
