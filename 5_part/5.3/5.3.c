@@ -2,86 +2,57 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include <sched.h>
 #include <sys/mman.h>
-#include <sys/types.h>
 #include <sys/wait.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <errno.h>
 
-#define STACK_SIZE  (1024 * 1024)  
-#define FILE_NAME   "stack_file.bin"
-#define MAX_DEPTH   10
+#define STACK_SIZE (64 * 1024)
+#define DEPTH      10
+#define MSG        "hello world"
 
-
-void recursive_hello(int depth)
+void recurse(int n)
 {
-    char message[] = "hello world";   
+    char buf[64];
+    memcpy(buf, MSG, sizeof(MSG));
 
-    printf("[child] depth=%d  message='%s'  &message=%p\n",
-           depth, message, (void *)message);
+    void *ret_addr = __builtin_return_address(0);
 
-    if (depth < MAX_DEPTH) {
-        recursive_hello(depth + 1);
-    }
+    printf("[child] depth=%d  buf@%p  ret@%p\n", n, buf, ret_addr);
+    
+    if (n < DEPTH)
+        recurse(n + 1);
 }
 
-
-int child_entry(void *arg)
+int child_fn(void *arg)
 {
-    (void)arg;
-    printf("[child] PID=%d, PPID=%d — started\n", getpid(), getppid());
-
-    recursive_hello(1);
-
-    printf("[child] done, exiting\n");
-    return 0;          
+    printf("[child] pid=%d ppid=%d\n", getpid(), getppid());
+    recurse(1);
+    return 0;
 }
-
 
 int main(void)
 {
+    int fd = open("stack.bin", O_RDWR | O_CREAT | O_TRUNC, 0600);
+    if (fd < 0) { perror("open"); exit(1); }
+    ftruncate(fd, STACK_SIZE);
 
-    int fd = open(FILE_NAME, O_RDWR | O_CREAT | O_TRUNC, 0644);
-    if (fd < 0) { perror("open"); return 1; }
+    void *stack = mmap(NULL, STACK_SIZE, PROT_READ | PROT_WRITE,
+                       MAP_SHARED, fd, 0);
+    if (stack == MAP_FAILED) { perror("mmap"); exit(1); }
+    close(fd);
 
-    if (ftruncate(fd, STACK_SIZE) < 0) { perror("ftruncate"); return 1; }
+    void *stacktop = (char *)stack + STACK_SIZE;
 
-    void *stack_mem = mmap(NULL, STACK_SIZE,
-                           PROT_READ | PROT_WRITE,
-                           MAP_SHARED,          
-                           fd, 0);
-    if (stack_mem == MAP_FAILED) { perror("mmap"); return 1; }
+    printf("[parent] pid=%d  stack file: stack.bin\n", getpid());
 
-    close(fd);  
+    pid_t pid = clone(child_fn, stacktop, SIGCHLD, NULL);
+    if (pid < 0) { perror("clone"); exit(1); }
 
-    void *stack_top = (char *)stack_mem + STACK_SIZE;
+    waitpid(pid, NULL, 0);
 
-    printf("[parent] PID=%d, stack_mem=%p, stack_top=%p\n",
-           getpid(), stack_mem, stack_top);
+    munmap(stack, STACK_SIZE);
 
-
-    pid_t child_pid = clone(child_entry,
-                            stack_top,
-                            SIGCHLD,    
-                            NULL);      
-
-    if (child_pid < 0) { perror("clone"); return 1; }
-
-    printf("[parent] cloned child PID=%d\n", child_pid);
-
-    int status;
-    waitpid(child_pid, &status, 0);
-    printf("[parent] child exited, status=%d\n", WEXITSTATUS(status));
-
-    msync(stack_mem, STACK_SIZE, MS_SYNC);
-
-    munmap(stack_mem, STACK_SIZE);
-
-    printf("[parent] Done. Inspect '%s' for results.\n", FILE_NAME);
-    printf("  strings %s | grep 'hello world'\n", FILE_NAME);
-    printf("  hexdump -C %s | grep -A1 'hello'\n", FILE_NAME);
-    return 0;
+    printf("[parent] done\n");
 }
