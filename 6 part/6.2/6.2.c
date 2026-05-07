@@ -39,8 +39,8 @@ void spawn_and_redirect() {
     dup2(pipefd[1], STDOUT_FILENO);
     close(pipefd[1]);
 
-    unsigned int numbers[] = {10, 20, 30, 40, 50};
-    for (int i = 0; i < 5; i++) {
+    unsigned int numbers[] = {10, 20, 30, 40, 50, 60, 70, 80, 90, 100};
+    for (int i = 0; i < 10; i++) {
       printf("%u\n", numbers[i]);
       fflush(stdout);  
       sleep(1);       
