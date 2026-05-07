@@ -9,7 +9,7 @@
 void *sh_buf;
 size_t pg_sz;
 pid_t pid;
-volatile sig_atomic_t got_sig = 0, stop = 0, sig_type = 0;
+int got_sig = 0, stop = 0, sig_type = 0;
 
 void hdl(int s) {
   if (s == SIGINT || s == SIGTERM) {

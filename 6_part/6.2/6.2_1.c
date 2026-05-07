@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#define _GNU_SOURCE // Это важно для доступа к специфичным флагам Linux
+#include <fcntl.h>   // Библиотека для fcntl
 
 int main() {
     int fd[2];
@@ -41,5 +43,6 @@ int main() {
         wait(NULL);   
         printf("[W] Писатель закончил.\n");
     }
+
     return 0;
 }

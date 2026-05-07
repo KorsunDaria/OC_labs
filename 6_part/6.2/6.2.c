@@ -54,5 +54,6 @@ void spawn_and_redirect() {
 
 int main() {
   spawn_and_redirect();
+
   return 0;
 }
