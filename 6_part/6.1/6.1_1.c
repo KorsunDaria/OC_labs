@@ -8,7 +8,8 @@ int main() {
   size_t pg_sz = sysconf(_SC_PAGESIZE);
   void *sh_buf =
       mmap(0, pg_sz, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-  unsigned int *buf = (unsigned int *)sh_buf, n = pg_sz / sizeof(int);
+  unsigned int *buf = (unsigned int *)sh_buf, n = 100;
+  int c=0;
 
   if (fork() == 0) {  
     unsigned int exp = 0;
@@ -16,10 +17,12 @@ int main() {
       for (size_t i = 0; i < n; i++) {
         if (buf[i] != exp) {
           printf("[Reader] Сбой! Ждали %u, получили %u\n", exp, buf[i]);
+          c++;
           exp = buf[i]; 
         }
         exp = (exp == UINT_MAX) ? 0 : exp + 1;
       }
+      if (c >= 100){return 0;}
     }
   } else {  
     unsigned int val = 0;

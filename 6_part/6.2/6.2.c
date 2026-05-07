@@ -6,9 +6,9 @@
 void run_child() {
   unsigned int received;
   while (scanf("%u", &received) != EOF) {
-    printf("[Дочерний процесс] Получено число: %u\n", received);
+    printf("[R] Получено число: %u\n", received);
   }
-  printf("[Дочерний процесс] Поток завершен.\n");
+  printf("[R] Поток завершен.\n");
 }
 
 void spawn_and_redirect() {

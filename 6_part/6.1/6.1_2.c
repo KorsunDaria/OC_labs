@@ -50,6 +50,8 @@ int main() {
         if (buf[i] != exp) {
           printf("[Reader] Сбой: ждали %u, получили %u\n", exp, buf[i]);
           exp = buf[i];
+        } else {
+          printf("[Reader] Все хорошо: ждали %u, получили %u\n", exp, buf[i]);
         }
         exp = (exp == UINT_MAX) ? 0 : exp + 1;
       }
