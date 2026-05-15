@@ -22,15 +22,13 @@ int main() {
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, SOCKET_PATH, sizeof(addr.sun_path) - 1);
 
-    // Удаляем старый файл сокета, если он остался
+
     unlink(SOCKET_PATH);
 
-    // 2. Привязка сокета (bind)
     if (bind(server_fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
         perror("bind error");
         exit(EXIT_FAILURE);
     }
-
 
     if (listen(server_fd, 5) == -1) {
         perror("listen error");
